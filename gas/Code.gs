@@ -151,6 +151,10 @@ function getPaymentsByCustomer(email, phone) {
     const emailMatch = email && rowEmail === email;
     const phoneMatch = phone && rowPhone === phone;
 
+    // Skip failed payments
+    const status = row[colIndex.status] ? row[colIndex.status].toString().toLowerCase() : '';
+    if (status === 'failed') continue;
+
     if (emailMatch || phoneMatch) {
       payments.push({
         id: row[colIndex.id] || '',
