@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Razorpay Transactions</title>
+  <style>
+    /* Reset and Base */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #1f2937;
+      background-color: #f9fafb;
+    }
+
+    .container {
+      max-width: 100%;
+      padding: 16px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .refresh-btn {
+      background: none;
+      border: none;
+      padding: 6px;
+      cursor: pointer;
+      color: #6b7280;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .refresh-btn:hover {
+      background-color: #e5e7eb;
+      color: #374151;
+    }
+
+    .refresh-btn.loading svg {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* Customer Info */
+    .customer-info {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .customer-info span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 0;
+    }
+
+    .tab {
+      padding: 8px 12px;
+      background: none;
+      border: none;
+      font-size: 13px;
+      font-weight: 500;
+      color: #6b7280;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tab:hover {
+      color: #374151;
+    }
+
+    .tab.active {
+      color: #2563eb;
+      border-bottom-color: #2563eb;
+    }
+
+    .count {
+      background-color: #e5e7eb;
+      color: #374151;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .tab.active .count {
+      background-color: #dbeafe;
+      color: #2563eb;
+    }
+
+    /* States */
+    .loading-state,
+    .waiting-state,
+    .empty-state,
+    .error-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      text-align: center;
+      color: #6b7280;
+    }
+
+    .spinner {
+      width: 32px;
+      height: 32px;
+      border: 3px solid #e5e7eb;
+      border-top-color: #2563eb;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 12px;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+
+    /* Cards */
+    .content {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .card {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      transition: box-shadow 0.2s;
+    }
+
+    .card:hover {
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .card-amount {
+      font-size: 16px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .card-id {
+      font-size: 11px;
+      color: #9ca3af;
+      font-family: monospace;
+      cursor: pointer;
+      padding: 2px 6px;
+      background: #f3f4f6;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .card-id:hover {
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    .card-id.copied {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .card-body {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .card-detail {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .card-detail svg {
+      width: 14px;
+      height: 14px;
+      opacity: 0.7;
+    }
+
+    .card-error {
+      margin-top: 8px;
+      padding: 8px;
+      background: #fef2f2;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #991b1b;
+    }
+
+    /* Status Badges */
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 12px;
+      text-transform: capitalize;
+    }
+
+    .status-captured,
+    .status-paid,
+    .status-processed {
+      background-color: #d1fae5;
+      color: #065f46;
+    }
+
+    .status-authorized,
+    .status-created,
+    .status-placed {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+
+    .status-pending,
+    .status-attempted {
+      background-color: #fef3c7;
+      color: #92400e;
+    }
+
+    .status-failed,
+    .status-refunded {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+
+    /* Refund indicator on payment card */
+    .refund-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: #f59e0b;
+      margin-left: 8px;
+    }
+
+    /* Receipt/Order Number */
+    .receipt {
+      font-weight: 500;
+      color: #374151;
+    }
+
+    /* Responsive */
+    @media (max-width: 400px) {
+      .card-header {
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .tabs {
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1 class="title">Razorpay Transactions</h1>
+      <button id="refreshBtn" class="refresh-btn" onclick="refreshData()" title="Refresh">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Customer Info -->
+    <div id="customerInfo" class="customer-info hidden">
+      <span id="customerEmail"></span>
+      <span id="customerPhone"></span>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="payments" onclick="switchTab('payments')">
+        Payments <span id="paymentsCount" class="count">0</span>
+      </button>
+      <button class="tab" data-tab="orders" onclick="switchTab('orders')">
+        Orders <span id="ordersCount" class="count">0</span>
+      </button>
+      <button class="tab" data-tab="refunds" onclick="switchTab('refunds')">
+        Refunds <span id="refundsCount" class="count">0</span>
+      </button>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="loading-state hidden">
+      <div class="spinner"></div>
+      <p>Fetching transactions...</p>
+    </div>
+
+    <!-- Waiting for Chatwoot State -->
+    <div id="waitingState" class="waiting-state">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5">
+        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+      </svg>
+      <p>Waiting for conversation data...</p>
+      <p class="hint">Open a conversation in Chatwoot to see customer transactions</p>
+    </div>
+
+    <!-- Empty State -->
+    <div id="emptyState" class="empty-state hidden">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M8 12h8M12 8v8"/>
+      </svg>
+      <p>No transactions found</p>
+      <p class="hint">No Razorpay transactions found for this customer</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="error-state hidden">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 8v4M12 16h.01"/>
+      </svg>
+      <p>Error loading data</p>
+      <p id="errorMessage" class="hint"></p>
+    </div>
+
+    <!-- Content Areas -->
+    <div id="paymentsContent" class="content hidden"></div>
+    <div id="ordersContent" class="content hidden"></div>
+    <div id="refundsContent" class="content hidden"></div>
+  </div>
+
+  <script>
+    // ============================================
+    // CONFIGURATION - UPDATE THIS URL
+    // ============================================
+    // After deploying Code.gs as a web app, paste the URL here:
+    const GAS_API_URL = 'https://script.google.com/macros/s/AKfycby3xr3v-KrjPqWR_vqj3gSTNtdr0fC0UBjLcd2zQV5BlEV6U3iG8INLyyPJS85j6XE3Mw/exec';
+    // Example: 'https://script.google.com/macros/s/AKfycbx.../exec'
+    // ============================================
+
+    // Global state
+    let currentData = {
+      payments: [],
+      orders: [],
+      refunds: []
+    };
+    let currentTab = 'payments';
+    let customerEmail = '';
+    let customerPhone = '';
+    let dataReceived = false;
+
+    // Initialize on load
+    document.addEventListener('DOMContentLoaded', function() {
+      console.log('[Razorpay] Dashboard app initialized');
+
+      // Set up Chatwoot message listener
+      window.addEventListener('message', handleChatwootMessage);
+
+      // Request data from Chatwoot immediately
+      requestChatwootData();
+
+      // Retry requesting data a few times in case of timing issues
+      setTimeout(requestChatwootData, 500);
+      setTimeout(requestChatwootData, 1500);
+      setTimeout(requestChatwootData, 3000);
+    });
+
+    /**
+     * Handle messages from Chatwoot
+     */
+    function handleChatwootMessage(event) {
+      // Log all messages for debugging
+      console.log('[Razorpay] Received message:', typeof event.data, event.data);
+
+      // Skip if we already have data
+      if (dataReceived) return;
+
+      let data;
+
+      // Handle both string and object data
+      if (typeof event.data === 'string') {
+        if (!isJsonString(event.data)) return;
+        try {
+          data = JSON.parse(event.data);
+        } catch (e) {
+          console.error('[Razorpay] Error parsing JSON:', e);
+          return;
+        }
+      } else if (typeof event.data === 'object' && event.data !== null) {
+        data = event.data;
+      } else {
+        return;
+      }
+
+      console.log('[Razorpay] Parsed data:', data);
+
+      // Check for Chatwoot appContext event
+      // Handle both data.data and direct data structure
+      let contextData = null;
+
+      if (data.event === 'appContext' && data.data) {
+        contextData = data.data;
+      } else if (data.data && (data.data.contact || data.data.conversation)) {
+        contextData = data.data;
+      } else if (data.contact || data.conversation) {
+        contextData = data;
+      }
+
+      if (contextData) {
+        console.log('[Razorpay] Context data found:', contextData);
+
+        const contact = contextData.contact || {};
+
+        // Extract email and phone - try multiple field names
+        const email = contact.email || '';
+        const phone = contact.phone_number || contact.phoneNumber || contact.phone || '';
+
+        console.log('[Razorpay] Contact info - Email:', email, 'Phone:', phone);
+
+        if (email || phone) {
+          dataReceived = true;
+          customerEmail = email;
+          customerPhone = phone;
+          fetchCustomerData(email, phone);
+        } else {
+          console.log('[Razorpay] No email or phone found in contact');
+          showState('empty');
+        }
+      }
+    }
+
+    /**
+     * Request data from Chatwoot
+     */
+    function requestChatwootData() {
+      try {
+        window.parent.postMessage('chatwoot-dashboard-app:fetch-info', '*');
+      } catch (e) {
+        console.log('[Razorpay] Not in Chatwoot iframe');
+      }
+    }
+
+    /**
+     * Fetch customer data from GAS API
+     */
+    async function fetchCustomerData(email, phone) {
+      showState('loading');
+
+      // Check if API URL is configured
+      if (!GAS_API_URL || GAS_API_URL === 'YOUR_GAS_DEPLOYMENT_URL_HERE') {
+        showError('GAS API URL not configured. Please update GAS_API_URL in index.html');
+        return;
+      }
+
+      try {
+        // Build API URL with query parameters
+        const params = new URLSearchParams();
+        if (email) params.append('email', email);
+        if (phone) params.append('phone', phone);
+
+        const url = `${GAS_API_URL}?${params.toString()}`;
+        console.log('[Razorpay] Fetching from:', url);
+
+        const response = await fetch(url);
+        const result = await response.json();
+
+        console.log('[Razorpay] API response:', result);
+        handleDataSuccess(result);
+
+      } catch (error) {
+        console.error('[Razorpay] Fetch error:', error);
+        handleDataError(error);
+      }
+    }
+
+    /**
+     * Handle successful data fetch
+     */
+    function handleDataSuccess(result) {
+      if (!result.success) {
+        showError(result.error || 'Unknown error');
+        return;
+      }
+
+      currentData = {
+        payments: result.payments || [],
+        orders: result.orders || [],
+        refunds: result.refunds || []
+      };
+
+      // Update counts
+      document.getElementById('paymentsCount').textContent = currentData.payments.length;
+      document.getElementById('ordersCount').textContent = currentData.orders.length;
+      document.getElementById('refundsCount').textContent = currentData.refunds.length;
+
+      // Update customer info
+      updateCustomerInfo(result.customerEmail, result.customerPhone);
+
+      // Check if any data exists
+      const hasData = currentData.payments.length > 0 ||
+                      currentData.orders.length > 0 ||
+                      currentData.refunds.length > 0;
+
+      if (hasData) {
+        renderCurrentTab();
+        showState('content');
+      } else {
+        showState('empty');
+      }
+    }
+
+    /**
+     * Handle data fetch error
+     */
+    function handleDataError(error) {
+      console.error('[Razorpay] Error fetching data:', error);
+      showError(error.message || 'Failed to fetch data');
+    }
+
+    /**
+     * Update customer info display
+     */
+    function updateCustomerInfo(email, phone) {
+      const infoEl = document.getElementById('customerInfo');
+      const emailEl = document.getElementById('customerEmail');
+      const phoneEl = document.getElementById('customerPhone');
+
+      if (email || phone) {
+        infoEl.classList.remove('hidden');
+        emailEl.textContent = email || '';
+        emailEl.classList.toggle('hidden', !email);
+        phoneEl.textContent = phone || '';
+        phoneEl.classList.toggle('hidden', !phone);
+      } else {
+        infoEl.classList.add('hidden');
+      }
+    }
+
+    /**
+     * Switch between tabs
+     */
+    function switchTab(tab) {
+      currentTab = tab;
+
+      // Update tab buttons
+      document.querySelectorAll('.tab').forEach(el => {
+        el.classList.toggle('active', el.dataset.tab === tab);
+      });
+
+      // Render content
+      renderCurrentTab();
+    }
+
+    /**
+     * Render the current tab's content
+     */
+    function renderCurrentTab() {
+      // Hide all content areas
+      document.getElementById('paymentsContent').classList.add('hidden');
+      document.getElementById('ordersContent').classList.add('hidden');
+      document.getElementById('refundsContent').classList.add('hidden');
+
+      // Render and show current tab
+      const contentEl = document.getElementById(currentTab + 'Content');
+
+      switch (currentTab) {
+        case 'payments':
+          contentEl.innerHTML = renderPayments(currentData.payments);
+          break;
+        case 'orders':
+          contentEl.innerHTML = renderOrders(currentData.orders);
+          break;
+        case 'refunds':
+          contentEl.innerHTML = renderRefunds(currentData.refunds);
+          break;
+      }
+
+      contentEl.classList.remove('hidden');
+    }
+
+    /**
+     * Render payments list
+     */
+    function renderPayments(payments) {
+      if (payments.length === 0) {
+        return '<div class="empty-state"><p>No payments found</p></div>';
+      }
+
+      return payments.map(p => `
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <span class="card-amount">${p.amount}</span>
+              ${p.refund_status ? '<span class="refund-indicator">Refunded</span>' : ''}
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="status status-${p.status}">${p.status}</span>
+              <span class="card-id" onclick="copyToClipboard(this, '${p.id}')" title="Click to copy">${truncateId(p.id)}</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <span class="card-detail">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              ${p.created_at_readable}
+            </span>
+            ${p.method ? `
+            <span class="card-detail">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+                <line x1="1" y1="10" x2="23" y2="10"/>
+              </svg>
+              ${p.method}
+            </span>
+            ` : ''}
+            ${p.receipt ? `<span class="card-detail receipt">${p.receipt}</span>` : ''}
+          </div>
+          ${p.status === 'failed' && p.error_description ? `
+          <div class="card-error">${p.error_description}</div>
+          ` : ''}
+        </div>
+      `).join('');
+    }
+
+    /**
+     * Render orders list
+     */
+    function renderOrders(orders) {
+      if (orders.length === 0) {
+        return '<div class="empty-state"><p>No orders found</p></div>';
+      }
+
+      return orders.map(o => `
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <span class="card-amount">${o.amount}</span>
+              ${o.receipt ? `<span class="receipt" style="margin-left: 8px; font-size: 13px;">${o.receipt}</span>` : ''}
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="status status-${o.status}">${o.status}</span>
+              <span class="card-id" onclick="copyToClipboard(this, '${o.order_id}')" title="Click to copy">${truncateId(o.order_id)}</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <span class="card-detail">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              ${o.created_at_readable}
+            </span>
+            ${o.amount_paid && o.amount_paid !== '₹0.00' ? `
+            <span class="card-detail" style="color: #065f46;">Paid: ${o.amount_paid}</span>
+            ` : ''}
+            ${o.amount_due && o.amount_due !== '₹0.00' ? `
+            <span class="card-detail" style="color: #991b1b;">Due: ${o.amount_due}</span>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    /**
+     * Render refunds list
+     */
+    function renderRefunds(refunds) {
+      if (refunds.length === 0) {
+        return '<div class="empty-state"><p>No refunds found</p></div>';
+      }
+
+      return refunds.map(r => `
+        <div class="card">
+          <div class="card-header">
+            <span class="card-amount">${r.amount}</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="status status-${r.status}">${r.status}</span>
+              <span class="card-id" onclick="copyToClipboard(this, '${r.id}')" title="Click to copy">${truncateId(r.id)}</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <span class="card-detail">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                <line x1="16" y1="2" x2="16" y2="6"/>
+                <line x1="8" y1="2" x2="8" y2="6"/>
+                <line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              ${r.created_at_readable}
+            </span>
+            ${r.speed_processed ? `
+            <span class="card-detail">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/>
+              </svg>
+              ${r.speed_processed}
+            </span>
+            ` : ''}
+            <span class="card-detail" style="color: #6b7280;">
+              Payment: ${truncateId(r.payment_id)}
+            </span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    /**
+     * Refresh data
+     */
+    function refreshData() {
+      const btn = document.getElementById('refreshBtn');
+      btn.classList.add('loading');
+
+      if (customerEmail || customerPhone) {
+        dataReceived = false; // Allow re-fetch
+        fetchCustomerData(customerEmail, customerPhone);
+      } else {
+        requestChatwootData();
+      }
+
+      // Remove loading class after a delay
+      setTimeout(() => btn.classList.remove('loading'), 1000);
+    }
+
+    /**
+     * Show a specific state
+     */
+    function showState(state) {
+      const states = ['loading', 'waiting', 'empty', 'error'];
+      const contentAreas = ['payments', 'orders', 'refunds'];
+
+      // Hide all states
+      states.forEach(s => {
+        document.getElementById(s + 'State').classList.add('hidden');
+      });
+
+      // Hide all content areas
+      contentAreas.forEach(c => {
+        document.getElementById(c + 'Content').classList.add('hidden');
+      });
+
+      // Show requested state
+      if (state === 'content') {
+        document.getElementById(currentTab + 'Content').classList.remove('hidden');
+      } else {
+        document.getElementById(state + 'State').classList.remove('hidden');
+      }
+    }
+
+    /**
+     * Show error state
+     */
+    function showError(message) {
+      document.getElementById('errorMessage').textContent = message;
+      showState('error');
+    }
+
+    /**
+     * Truncate ID for display
+     */
+    function truncateId(id) {
+      if (!id) return '';
+      if (id.length <= 15) return id;
+      return id.substring(0, 12) + '...';
+    }
+
+    /**
+     * Copy text to clipboard
+     */
+    function copyToClipboard(element, text) {
+      navigator.clipboard.writeText(text).then(() => {
+        element.classList.add('copied');
+        const originalText = element.textContent;
+        element.textContent = 'Copied!';
+
+        setTimeout(() => {
+          element.classList.remove('copied');
+          element.textContent = originalText;
+        }, 1500);
+      }).catch(err => {
+        console.error('Failed to copy:', err);
+      });
+    }
+
+    /**
+     * Check if string is valid JSON
+     */
+    function isJsonString(str) {
+      try {
+        JSON.parse(str);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+  </script>
+</body>
+</html>
