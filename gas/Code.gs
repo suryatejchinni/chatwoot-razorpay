@@ -104,7 +104,7 @@ function getAllCustomerData(email, phone) {
 }
 
 /**
- * Get payments by customer email or phone
+ * Get payments by customer email or phone using TextFinder (optimized)
  */
 function getPaymentsByCustomer(email, phone) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -115,13 +115,13 @@ function getPaymentsByCustomer(email, phone) {
     return [];
   }
 
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return []; // No data besides header
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return []; // No data besides header
 
-  const headers = data[0];
-  const rows = data.slice(1);
+  const lastCol = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
 
-  // Find column indices
+  // Find column indices (1-based for getRange)
   const colIndex = {
     id: headers.indexOf('id'),
     amount: headers.indexOf('amount'),
@@ -139,41 +139,56 @@ function getPaymentsByCustomer(email, phone) {
     receipt: headers.indexOf('receipt')
   };
 
-  // Filter rows by email or phone
+  // Use TextFinder to find matching rows
+  const matchingRows = new Set();
+
+  if (email) {
+    const emailCol = colIndex.email + 1; // 1-based
+    const emailRange = sheet.getRange(2, emailCol, lastRow - 1, 1);
+    const finder = emailRange.createTextFinder(email)
+      .matchEntireCell(true)
+      .matchCase(false);
+    finder.findAll().forEach(cell => matchingRows.add(cell.getRow()));
+  }
+
+  if (phone) {
+    const contactCol = colIndex.contact + 1; // 1-based
+    const contactRange = sheet.getRange(2, contactCol, lastRow - 1, 1);
+    const finder = contactRange.createTextFinder(phone)
+      .matchEntireCell(true);
+    finder.findAll().forEach(cell => matchingRows.add(cell.getRow()));
+  }
+
+  // Fetch only matching rows (limit to 50)
   const payments = [];
+  const rowArray = Array.from(matchingRows).slice(0, 60); // Fetch a few extra in case some are filtered
 
-  for (let i = 0; i < rows.length && payments.length < 50; i++) {
-    const row = rows[i];
-    const rowEmail = row[colIndex.email] ? row[colIndex.email].toString().toLowerCase().trim() : '';
-    const rowPhone = normalizePhone(row[colIndex.contact]);
+  for (const rowNum of rowArray) {
+    if (payments.length >= 50) break;
 
-    // Match by email or phone
-    const emailMatch = email && rowEmail === email;
-    const phoneMatch = phone && rowPhone === phone;
+    const rowData = sheet.getRange(rowNum, 1, 1, lastCol).getValues()[0];
 
     // Skip failed payments
-    const status = row[colIndex.status] ? row[colIndex.status].toString().toLowerCase() : '';
+    const status = rowData[colIndex.status] ? rowData[colIndex.status].toString().toLowerCase() : '';
     if (status === 'failed') continue;
 
-    if (emailMatch || phoneMatch) {
-      payments.push({
-        id: row[colIndex.id] || '',
-        amount: formatAmount(row[colIndex.amount]),
-        amountRaw: row[colIndex.amount] || 0,
-        currency: row[colIndex.currency] || 'INR',
-        status: row[colIndex.status] || '',
-        order_id: row[colIndex.order_id] || '',
-        method: row[colIndex.method] || '',
-        amount_refunded: formatAmount(row[colIndex.amount_refunded]),
-        refund_status: row[colIndex.refund_status] || '',
-        description: row[colIndex.description] || '',
-        email: row[colIndex.email] || '',
-        contact: row[colIndex.contact] || '',
-        error_description: row[colIndex.error_description] || '',
-        created_at_readable: row[colIndex.created_at_readable] || '',
-        receipt: row[colIndex.receipt] || ''
-      });
-    }
+    payments.push({
+      id: rowData[colIndex.id] || '',
+      amount: formatAmount(rowData[colIndex.amount]),
+      amountRaw: rowData[colIndex.amount] || 0,
+      currency: rowData[colIndex.currency] || 'INR',
+      status: rowData[colIndex.status] || '',
+      order_id: rowData[colIndex.order_id] || '',
+      method: rowData[colIndex.method] || '',
+      amount_refunded: formatAmount(rowData[colIndex.amount_refunded]),
+      refund_status: rowData[colIndex.refund_status] || '',
+      description: rowData[colIndex.description] || '',
+      email: rowData[colIndex.email] || '',
+      contact: rowData[colIndex.contact] || '',
+      error_description: rowData[colIndex.error_description] || '',
+      created_at_readable: rowData[colIndex.created_at_readable] || '',
+      receipt: rowData[colIndex.receipt] || ''
+    });
   }
 
   // Sort by date (newest first)
@@ -187,7 +202,7 @@ function getPaymentsByCustomer(email, phone) {
 }
 
 /**
- * Get orders by payment IDs
+ * Get orders by payment IDs using TextFinder (optimized)
  */
 function getOrdersByPaymentIds(paymentIds) {
   if (!paymentIds || paymentIds.length === 0) return [];
@@ -200,11 +215,11 @@ function getOrdersByPaymentIds(paymentIds) {
     return [];
   }
 
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
 
-  const headers = data[0];
-  const rows = data.slice(1);
+  const lastCol = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
 
   // Find column indices
   const colIndex = {
@@ -220,30 +235,38 @@ function getOrdersByPaymentIds(paymentIds) {
     payment_id: headers.indexOf('payment_id')
   };
 
-  // Create a Set for faster lookup
-  const paymentIdSet = new Set(paymentIds);
+  // Use TextFinder to find matching rows for each payment ID
+  const matchingRows = new Set();
+  const paymentIdCol = colIndex.payment_id + 1; // 1-based
+  const paymentIdRange = sheet.getRange(2, paymentIdCol, lastRow - 1, 1);
 
+  for (const paymentId of paymentIds) {
+    if (!paymentId) continue;
+    const finder = paymentIdRange.createTextFinder(paymentId)
+      .matchEntireCell(true);
+    finder.findAll().forEach(cell => matchingRows.add(cell.getRow()));
+  }
+
+  // Fetch only matching rows (limit to 50)
   const orders = [];
+  const rowArray = Array.from(matchingRows).slice(0, 50);
 
-  for (let i = 0; i < rows.length && orders.length < 50; i++) {
-    const row = rows[i];
-    const rowPaymentId = row[colIndex.payment_id] ? row[colIndex.payment_id].toString() : '';
+  for (const rowNum of rowArray) {
+    const rowData = sheet.getRange(rowNum, 1, 1, lastCol).getValues()[0];
 
-    if (paymentIdSet.has(rowPaymentId)) {
-      orders.push({
-        order_id: row[colIndex.order_id] || '',
-        amount: formatAmount(row[colIndex.amount]),
-        amountRaw: row[colIndex.amount] || 0,
-        amount_paid: formatAmount(row[colIndex.amount_paid]),
-        amount_due: formatAmount(row[colIndex.amount_due]),
-        currency: row[colIndex.currency] || 'INR',
-        receipt: row[colIndex.receipt] || '',
-        status: row[colIndex.status] || '',
-        attempts: row[colIndex.attempts] || 0,
-        created_at_readable: row[colIndex.created_at_readable] || '',
-        payment_id: rowPaymentId
-      });
-    }
+    orders.push({
+      order_id: rowData[colIndex.order_id] || '',
+      amount: formatAmount(rowData[colIndex.amount]),
+      amountRaw: rowData[colIndex.amount] || 0,
+      amount_paid: formatAmount(rowData[colIndex.amount_paid]),
+      amount_due: formatAmount(rowData[colIndex.amount_due]),
+      currency: rowData[colIndex.currency] || 'INR',
+      receipt: rowData[colIndex.receipt] || '',
+      status: rowData[colIndex.status] || '',
+      attempts: rowData[colIndex.attempts] || 0,
+      created_at_readable: rowData[colIndex.created_at_readable] || '',
+      payment_id: rowData[colIndex.payment_id] || ''
+    });
   }
 
   // Sort by date (newest first)
@@ -257,7 +280,7 @@ function getOrdersByPaymentIds(paymentIds) {
 }
 
 /**
- * Get refunds by payment IDs
+ * Get refunds by payment IDs using TextFinder (optimized)
  */
 function getRefundsByPaymentIds(paymentIds) {
   if (!paymentIds || paymentIds.length === 0) return [];
@@ -270,11 +293,11 @@ function getRefundsByPaymentIds(paymentIds) {
     return [];
   }
 
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
 
-  const headers = data[0];
-  const rows = data.slice(1);
+  const lastCol = sheet.getLastColumn();
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
 
   // Find column indices
   const colIndex = {
@@ -289,29 +312,37 @@ function getRefundsByPaymentIds(paymentIds) {
     receipt: headers.indexOf('receipt')
   };
 
-  // Create a Set for faster lookup
-  const paymentIdSet = new Set(paymentIds);
+  // Use TextFinder to find matching rows for each payment ID
+  const matchingRows = new Set();
+  const paymentIdCol = colIndex.payment_id + 1; // 1-based
+  const paymentIdRange = sheet.getRange(2, paymentIdCol, lastRow - 1, 1);
 
+  for (const paymentId of paymentIds) {
+    if (!paymentId) continue;
+    const finder = paymentIdRange.createTextFinder(paymentId)
+      .matchEntireCell(true);
+    finder.findAll().forEach(cell => matchingRows.add(cell.getRow()));
+  }
+
+  // Fetch only matching rows (limit to 50)
   const refunds = [];
+  const rowArray = Array.from(matchingRows).slice(0, 50);
 
-  for (let i = 0; i < rows.length && refunds.length < 50; i++) {
-    const row = rows[i];
-    const rowPaymentId = row[colIndex.payment_id] ? row[colIndex.payment_id].toString() : '';
+  for (const rowNum of rowArray) {
+    const rowData = sheet.getRange(rowNum, 1, 1, lastCol).getValues()[0];
 
-    if (paymentIdSet.has(rowPaymentId)) {
-      refunds.push({
-        id: row[colIndex.id] || '',
-        amount: formatAmount(row[colIndex.amount]),
-        amountRaw: row[colIndex.amount] || 0,
-        currency: row[colIndex.currency] || 'INR',
-        payment_id: rowPaymentId,
-        status: row[colIndex.status] || '',
-        created_at_readable: row[colIndex.created_at_readable] || '',
-        speed_requested: row[colIndex.speed_requested] || '',
-        speed_processed: row[colIndex.speed_processed] || '',
-        receipt: row[colIndex.receipt] || ''
-      });
-    }
+    refunds.push({
+      id: rowData[colIndex.id] || '',
+      amount: formatAmount(rowData[colIndex.amount]),
+      amountRaw: rowData[colIndex.amount] || 0,
+      currency: rowData[colIndex.currency] || 'INR',
+      payment_id: rowData[colIndex.payment_id] || '',
+      status: rowData[colIndex.status] || '',
+      created_at_readable: rowData[colIndex.created_at_readable] || '',
+      speed_requested: rowData[colIndex.speed_requested] || '',
+      speed_processed: rowData[colIndex.speed_processed] || '',
+      receipt: rowData[colIndex.receipt] || ''
+    });
   }
 
   // Sort by date (newest first)
